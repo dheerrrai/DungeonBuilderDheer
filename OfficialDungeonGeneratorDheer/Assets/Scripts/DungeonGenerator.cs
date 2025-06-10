@@ -83,8 +83,10 @@ public class DungeonGenerator : MonoBehaviour
             int SmallestHeight = Rooms[SmallestRoomIndex].height;
             int SmallestWidth = Rooms[SmallestRoomIndex].width;
 
-            if (Rooms[i].height / Rooms[i].width < SmallestHeight / SmallestWidth) SmallestRoomIndex=i; 
+            if (Rooms[i].height * Rooms[i].width < SmallestHeight * SmallestWidth) SmallestRoomIndex=i; 
+
         }
+        Rooms.Remove(Rooms[SmallestRoomIndex]);
 
     }
     private (RectInt, RectInt)? Splitlogic(RectInt PRect, float? GarunteeBias = 0)
