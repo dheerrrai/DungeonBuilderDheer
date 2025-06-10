@@ -1,7 +1,7 @@
 using NaughtyAttributes;
+
 using System.Collections;
 using System.Collections.Generic;
-using UnityEditor;
 using UnityEngine;
 
 public class DungeonGenerator : MonoBehaviour
@@ -37,6 +37,7 @@ public class DungeonGenerator : MonoBehaviour
     }
     public IEnumerator GenerateDungeon()
     {
+        int SmallestRoomIndex = 0;
         Rooms.Clear();
         Rooms.Add(RectInt); // Start with the initial full area
 
@@ -76,11 +77,21 @@ public class DungeonGenerator : MonoBehaviour
             Rooms = newRooms;
             yield return new WaitForSeconds(CouroutineTime);
         }
+
+        for(int i = 0; i < Rooms.Count; i++) 
+        {        
+            int SmallestHeight = Rooms[SmallestRoomIndex].height;
+            int SmallestWidth = Rooms[SmallestRoomIndex].width;
+
+            if (Rooms[i].height / Rooms[i].width < SmallestHeight / SmallestWidth) SmallestRoomIndex=i; 
+        }
+
     }
-    private (RectInt, RectInt)? Splitlogic(RectInt PRect)
+    private (RectInt, RectInt)? Splitlogic(RectInt PRect, float? GarunteeBias = 0)
     {
         float aspectRatio = (float)PRect.width / PRect.height;
         float HorizontalSplitChance = 0.5f;
+        
 
         // Bias split chance based on aspect ratio
         if (aspectRatio > 1.25f)
@@ -92,18 +103,34 @@ public class DungeonGenerator : MonoBehaviour
             HorizontalSplitChance = 0.85f;
         } 
 
-        bool SplitHorizontally = Random.value < HorizontalSplitChance;
+        
+
+        bool SplitHorizontally = Random.value + GarunteeBias < HorizontalSplitChance;
 
         float BufferProper = Random.Range(-SplitBuffer, SplitBuffer);
+
+        int minHeight = MinimumRoomSize.y;
+        int minWidth = MinimumRoomSize.x;
 
 
         if (SplitHorizontally)
         {
             
 
-            int minHeight = MinimumRoomSize.y;
+            
             if (PRect.height < minHeight * 2)
-                return null;
+            {
+
+                if (PRect.width > minWidth * 2 && GarunteeBias == 0f)
+                {
+                    Debug.Log("Recursed");
+                    return Splitlogic(PRect, -1f);
+
+                }
+
+                return null; 
+            }
+            
 
             int splitY = Mathf.Clamp(PRect.height / 2 + (int)(PRect.height * SplitBuffer), minHeight, PRect.height - minHeight);
 
@@ -114,9 +141,19 @@ public class DungeonGenerator : MonoBehaviour
         }
         else
         {
-            int minWidth = MinimumRoomSize.x;
+
             if (PRect.width < minWidth * 2)
+            {
+
+                if (PRect.height > minHeight * 2 && GarunteeBias == 0f)
+                {
+                    Debug.Log("Recursed");
+                    return Splitlogic(PRect, 1f);
+
+                }
+
                 return null;
+            }
 
             int splitX = Mathf.Clamp(PRect.width / 2 + (int)(PRect.width * SplitBuffer), minWidth, PRect.width - minWidth);
 
@@ -128,22 +165,5 @@ public class DungeonGenerator : MonoBehaviour
         
     }
 
-    private (RectInt, RectInt) SplitHorizontally(RectInt PRect)
-    {
-
-        RectInt RoomA = new RectInt(PRect.x, PRect.y, PRect.width,PRect.height/2);
-        RectInt RoomB = new RectInt(PRect.x, PRect.height / 2, PRect.width, PRect.height / 2);
-        
-
-        return (RoomA, RoomB);
-    }
-    private (RectInt, RectInt) SplitVertically(RectInt PRect)
-    {
-
-        RectInt RoomA = new RectInt(PRect.x, PRect.y, PRect.width/2,PRect.height);
-        RectInt RoomB = new RectInt(PRect.width / 2, PRect.y, PRect.width/2, PRect.height);
-        
-
-        return (RoomA, RoomB);
-    }
+    
 }
