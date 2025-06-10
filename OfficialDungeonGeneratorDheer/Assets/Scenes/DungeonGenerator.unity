@@ -473,10 +473,10 @@ MonoBehaviour:
   RectInt:
     x: 0
     y: 0
-    width: 100
-    height: 50
+    width: 500
+    height: 250
   Rooms: []
-  RoomsCount: 0
+  RoomsCount: 4
   CouroutineTime: 0.1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
