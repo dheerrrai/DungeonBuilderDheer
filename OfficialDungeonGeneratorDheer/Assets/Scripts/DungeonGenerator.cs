@@ -6,6 +6,7 @@ using Unity.AI.Navigation;
 using Unity.VisualScripting;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Tilemaps;
 
 public class DungeonGenerator : MonoBehaviour
 {
@@ -16,8 +17,13 @@ public class DungeonGenerator : MonoBehaviour
     public float CouroutineTime = 0.1f;
     public float SplitBuffer = 0.2f;
 
-    public Graph<RectInt> Graph;
+    public int DoorRange=2;
+    public Graph GraphScript;
+    public Graph<RectInt> DungeonGraph;
 
+    public List<Vector2Int> DoorCoords = new List<Vector2Int>();
+
+    public float YHeight = 5f;
     [Space(10)]
     public GameObject Floor;
 
@@ -36,7 +42,7 @@ public class DungeonGenerator : MonoBehaviour
     void Start()
     {
         //Hi
-        Graph = new Graph<RectInt>();
+        DungeonGraph = new Graph<RectInt>();
         Rooms.Clear();
         Rooms.Add(RectInt);
         Debug.Log($"Generated {Rooms.Count} rooms");
@@ -51,15 +57,19 @@ public class DungeonGenerator : MonoBehaviour
         {
 
             AlgorithmsUtils.DebugRectInt(Room, color: Color.red);
-            //Graph Debug Show
-            Vector3 CentreCoodrinate = new Vector3(Room.center.x, 0f, Room.center.y);
-            DebugExtension.DebugCircle(CentreCoodrinate);
+            
 
         }
+
+        
+        
+
+        
+
     }
     public IEnumerator GenerateDungeon()
     {
-        
+        DoorCoords.Clear();
         int SmallestRoomIndex = 0;
         Rooms.Clear();
         Rooms.Add(RectInt); // Start with the initial full area
@@ -112,17 +122,102 @@ public class DungeonGenerator : MonoBehaviour
         Rooms.Remove(Rooms[SmallestRoomIndex]);
 
         GraphCreatorAndConnecter(Rooms);
+        CreateDoorsForOverlappingRooms(Rooms);
+    }
+    
 
+    void CreateDoorsForOverlappingRooms(List<RectInt> rooms)
+    {
+        DoorCoords.Clear();
+        for (int i = 0; i < rooms.Count; i++)
+        {
+            for (int j = i + 1; j < rooms.Count; j++)
+            {
+                RectInt RoomA = rooms[i];
+                RectInt RoomB = rooms[j];
+                int xMin = 0;
+                int xMax = 0;
+                int yMin = 0;
+                int yMax = 0;
+                if (RoomA.Overlaps(RoomB))
+                {
+                    RectInt OverLap = AlgorithmsUtils.Intersect(RoomA, RoomB);
+                    int doorX = 0;
+                    int doorY = 0;
+                    if (OverLap.width < OverLap.height)
+                    {
+
+                        // Get the range of the door spot
+                        xMin = Mathf.Max(RoomA.xMin, RoomB.xMin);
+                        xMax = Mathf.Min(RoomA.xMax - 2, RoomB.xMax - 2);
+                        yMin = Mathf.Max(RoomA.yMin , RoomB.yMin );
+                        yMax = Mathf.Min(RoomA.yMax - 2, RoomB.yMax - 2);
+                        
+                        doorX = OverLap.x;
+                        doorY = Random.Range(yMin+1, yMax);
+                    }
+                    else
+                    {
+
+                        // Get the range of the door spot
+                        xMin = Mathf.Max(RoomA.xMin + 2, RoomB.xMin +2);
+                        xMax = Mathf.Min(RoomA.xMax , RoomB.xMax );
+                        yMin = Mathf.Max(RoomA.yMin + 2, RoomB.yMin + 2);
+                        yMax = Mathf.Min(RoomA.yMax, RoomB.yMax);
+                        
+                        doorX = Random.Range(xMin, xMax-1);
+                        doorY = OverLap.y;
+                    }
+                    //Choose a point in the overlapping area for a door
+
+                    
+
+
+                    int overlapWidth = xMax  - xMin;
+                    int overlapHeight = yMax  - yMin;
+
+
+                    if (overlapWidth <= 2 && overlapHeight <= 2) continue; //Basically removes 1x1 corners that overlap more than one rect
+                    //int doorX = ((xMin + xMax) / 2);
+                    //int doorY = ((yMin + yMax) / 2);
+                    
+                    
+
+                    
+
+                    Vector2Int NewCoords = new Vector2Int(doorX, doorY);
+
+                    RectInt DoorRect = new RectInt(NewCoords, new Vector2Int(1, 1));
+
+                    if (!DoorCoords.Contains(NewCoords))
+                    //PlaceDoor(new Vector2Int(doorX, doorY);
+                    {
+                        
+                        DungeonGraph.AddNode(DoorRect);
+                        DoorCoords.Add(NewCoords);
+                        DungeonGraph.AddLink(RoomA, DoorRect);
+                        DungeonGraph.AddLink(DoorRect, RoomB);
+                    }
+                }
+            }
+            //if (overlapWidth > 7 && overlapHeight > 7)
+            //{
+            //    DoorCoords.Add(new Vector2Int(NewCoords.x, NewCoords.y));
+            //}
+
+
+        }
     }
 
+    
     public void GraphCreatorAndConnecter(List<RectInt> RoomList)
     {
         foreach(RectInt Room in RoomList)
         {
-            Graph.AddNode(Room);
+            DungeonGraph.AddNode(Room);
             
         }
-        Graph.PrintGraph();
+        //DungeonGraph.PrintGraph();
     }
 
     private (RectInt, RectInt)? Splitlogic(RectInt PRect, float? GarunteeBias = 0)
@@ -220,11 +315,11 @@ public class DungeonGenerator : MonoBehaviour
         PlacedWalls.Clear();
         foreach (RectInt i in Rooms)
         {
-            foreach (Vector2 j in i.allPositionsWithin)
+            foreach (Vector2Int j in i.allPositionsWithin)
             {
                 
                 //if ((j.x == i.xMax - 1 || j.x == i.xMin || j.y == i.yMax - 1 || j.y == i.yMin) && j != Door.position && !PlacedWalls.Contains(j))
-                if ((j.x == i.xMax - 1 || j.x == i.xMin || j.y == i.yMax - 1 || j.y == i.yMin) && !PlacedWalls.Contains(j))
+                if ((j.x == i.xMax - 1 || j.x == i.xMin || j.y == i.yMax - 1 || j.y == i.yMin) && !PlacedWalls.Contains(j) && !DoorCoords.Contains(j))
                 {
                     yield return new WaitForNextFrameUnit();
                     GameObject WallPiece = Instantiate(Wall, new Vector3(j.x + 0.5f, 0.5f, j.y + 0.5f), Wall.transform.rotation, WallParent.transform);
@@ -262,5 +357,36 @@ public class DungeonGenerator : MonoBehaviour
         NavMeshSurface.BuildNavMesh();
     }
 
+    public void OnDrawGizmos()
+    {
+        
+        {
+            if (DungeonGraph == null) return;
 
+            foreach (RectInt Room in Rooms)
+            {
+                if (!DungeonGraph.ContainsNode(Room)) continue;
+                Vector3 CentreCoodrinate = new Vector3(Room.center.x, YHeight, Room.center.y);
+                Gizmos.color = Color.red;
+                Gizmos.DrawSphere(CentreCoodrinate, 1f);
+                foreach(RectInt Nodes in DungeonGraph.FindLinks(Room))
+                {
+                    Vector3 CentreNodeCoodrinate = new Vector3(Nodes.center.x, YHeight, Nodes.center.y);
+                    Gizmos.color = Color.blue;
+                    Gizmos.DrawLine(CentreCoodrinate, CentreNodeCoodrinate);
+                    Gizmos.color = Color.red;
+                    Gizmos.DrawSphere(CentreNodeCoodrinate, 1f);
+                }
+            }
+            //foreach (Rect in Graph)
+            //{
+                
+            //    foreach (RectInt Room in Node)
+            //    {
+
+            //        Room.center;
+            //    }
+            //}
+        }
+    }
 }

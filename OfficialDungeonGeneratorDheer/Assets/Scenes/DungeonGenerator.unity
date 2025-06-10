@@ -540,10 +540,13 @@ MonoBehaviour:
     y: 87
     width: 52
     height: 13
-  RoomsCount: 26
+  RoomsCount: 59
   MinimumRoomSize: {x: 5, y: 6}
   CouroutineTime: 0.1
   SplitBuffer: 0.2
+  DoorRange: 2
+  DoorCoords: []
+  YHeight: 5
   Floor: {fileID: 471116275126690552, guid: 65c55e1d941652b44bda64bc9693f519, type: 3}
   WallPos: []
   Wall: {fileID: 5282930976620630943, guid: 687b15cc52f2ce44a9c04368e0ae5bbe, type: 3}

@@ -31,12 +31,18 @@ public class Graph<T>
         GraphDict[FromNode].Add(ToNode);
         GraphDict[ToNode].Add(FromNode);
     }
-    public void FindLinks(T Node)
+    public List<T> FindLinks(T Node)
     {
-        foreach (T Values in GraphDict[Node])
+        if (!GraphDict.ContainsKey(Node))
         {
-
+            return new List<T>();
         }
+
+        return new List<T>(GraphDict[Node]);
+    }
+    public bool ContainsNode(T node)
+    {
+        return GraphDict.ContainsKey(node);
     }
     public void PrintGraph()
     {
@@ -59,7 +65,7 @@ public class Graph<T>
         }
         return ListPrinted;
     }
-    public void BFS(T Node)
+    public Queue<T> BFS(T Node)
     {
         List<T> Discovered = new List<T>();
         Queue<T> Queue = new Queue<T>();
@@ -79,9 +85,10 @@ public class Graph<T>
                 }
             }
         }
+        return Queue;
 
     }
-    public void DFS(T Node)
+    public Stack<T> DFS(T Node)
     {
         List<T> Discovered = new List<T>();
         Stack<T> Stack = new Stack<T>();
@@ -99,6 +106,7 @@ public class Graph<T>
                 }
             }
         }
+        return Stack;
     }
 
 }
