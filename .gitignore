@@ -1,7 +1,9 @@
 ﻿OfficialDungeonGeneratorDheer/Library
 OfficialDungeonGeneratorDheer/Logs
 OfficialDungeonGeneratorDheer/UserSettings
+OfficialDungeonGeneratorDheer/Temp
+OfficialDungeonGeneratorDheer/obj
+
 *.csproj
 *.sln
 *.vsconfig
-OfficialDungeonGeneratorDheer/Temp
