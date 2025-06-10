@@ -2,6 +2,9 @@ using NaughtyAttributes;
 
 using System.Collections;
 using System.Collections.Generic;
+using Unity.AI.Navigation;
+using Unity.VisualScripting;
+using UnityEditor;
 using UnityEngine;
 
 public class DungeonGenerator : MonoBehaviour
@@ -13,8 +16,19 @@ public class DungeonGenerator : MonoBehaviour
     public float CouroutineTime = 0.1f;
     public float SplitBuffer = 0.2f;
 
-    public Graph<RectInt> Graph;    
+    public Graph<RectInt> Graph;
 
+    [Space(10)]
+    public GameObject Floor;
+
+    public List<GameObject> WallPos = new List<GameObject>();
+    private List<Vector2> PlacedWalls = new List<Vector2>();
+    private List<GameObject> PlacedFloors = new();
+    public GameObject Wall;
+    private GameObject WallParent;
+    private GameObject FloorParent;
+    public NavMeshSurface NavMeshSurface;
+    public float BuildTime = 0.01f;
 
     [Button]
 
@@ -158,7 +172,7 @@ public class DungeonGenerator : MonoBehaviour
 
             int splitY = Mathf.Clamp(PRect.height / 2 + (int)(PRect.height * BufferProper), minHeight, PRect.height - minHeight);
 
-            RectInt RoomA = new RectInt(PRect.x, PRect.y, PRect.width, splitY);
+            RectInt RoomA = new RectInt(PRect.x, PRect.y, PRect.width, splitY +1);
             RectInt RoomB = new RectInt(PRect.x, PRect.y + splitY, PRect.width, PRect.height - splitY);
 
             return (RoomA, RoomB);
@@ -181,13 +195,72 @@ public class DungeonGenerator : MonoBehaviour
 
             int splitX = Mathf.Clamp(PRect.width / 2 + (int)(PRect.width * BufferProper), minWidth, PRect.width - minWidth);
 
-            RectInt RoomA = new RectInt(PRect.x, PRect.y, splitX, PRect.height);
-            RectInt RoomB = new RectInt(PRect.x + splitX, PRect.y, PRect.width - splitX, PRect.height);
+            RectInt RoomA = new RectInt(PRect.x, PRect.y, splitX + 1, PRect.height  );
+            RectInt RoomB = new RectInt(PRect.x + splitX, PRect.y, PRect.width - splitX, PRect.height );
 
             return (RoomA, RoomB);
         }
         
     }
 
-    
+    [Button]
+    public IEnumerator SpawnDungeonAssets()
+    {
+        Destroy(WallParent);
+        Destroy(FloorParent);
+
+        WallParent = new GameObject("WallParent");
+        FloorParent = new GameObject("FloorParent");
+
+
+
+
+        PlacedFloors.Clear();
+        WallPos.Clear();
+        PlacedWalls.Clear();
+        foreach (RectInt i in Rooms)
+        {
+            foreach (Vector2 j in i.allPositionsWithin)
+            {
+                
+                //if ((j.x == i.xMax - 1 || j.x == i.xMin || j.y == i.yMax - 1 || j.y == i.yMin) && j != Door.position && !PlacedWalls.Contains(j))
+                if ((j.x == i.xMax - 1 || j.x == i.xMin || j.y == i.yMax - 1 || j.y == i.yMin) && !PlacedWalls.Contains(j))
+                {
+                    yield return new WaitForNextFrameUnit();
+                    GameObject WallPiece = Instantiate(Wall, new Vector3(j.x + 0.5f, 0.5f, j.y + 0.5f), Wall.transform.rotation, WallParent.transform);
+                    WallPos.Add(WallPiece);
+                    PlacedWalls.Add(j);
+                }
+
+
+            }
+            FloorGenerate(i, i.width, i.height);
+
+
+        }
+        StartCoroutine(Wait());
+
+
+
+    }
+    public void FloorGenerate(RectInt Room, float Width, float Height)
+    {
+        GameObject FloorObj = Instantiate(Floor, new Vector3(Room.center.x, 0f, Room.center.y), Floor.transform.rotation, FloorParent.transform);
+        FloorObj.transform.localScale = new Vector3(Width, Height, 1f);
+    }
+
+    // Create the BakeNavMesh() function here
+    [Button]
+    public void BakeNavMesh()
+    {
+
+    }
+    IEnumerator Wait()
+    {
+
+        yield return new WaitForSeconds(0.1f);
+        NavMeshSurface.BuildNavMesh();
+    }
+
+
 }
