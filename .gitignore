@@ -1,0 +1,6 @@
+﻿OfficialDungeonGeneratorDheer/Library
+OfficialDungeonGeneratorDheer/Logs
+OfficialDungeonGeneratorDheer/UserSettings
+*.csproj
+*.sln
+*.vsconfig
