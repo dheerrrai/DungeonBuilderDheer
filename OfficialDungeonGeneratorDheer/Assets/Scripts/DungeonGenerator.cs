@@ -12,12 +12,17 @@ public class DungeonGenerator : MonoBehaviour
     [SerializeField] private Vector2Int MinimumRoomSize = new Vector2Int(6, 6);
     public float CouroutineTime = 0.1f;
     public float SplitBuffer = 0.2f;
+
+    public Graph<RectInt> Graph;    
+
+
     [Button]
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
         //Hi
+        Graph = new Graph<RectInt>();
         Rooms.Clear();
         Rooms.Add(RectInt);
         Debug.Log($"Generated {Rooms.Count} rooms");
@@ -28,15 +33,19 @@ public class DungeonGenerator : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        foreach(RectInt room in Rooms) 
+        foreach(RectInt Room in Rooms) 
         {
 
-            AlgorithmsUtils.DebugRectInt(room, color: Color.red); 
-        
+            AlgorithmsUtils.DebugRectInt(Room, color: Color.red);
+            //Graph Debug Show
+            Vector3 CentreCoodrinate = new Vector3(Room.center.x, 0f, Room.center.y);
+            DebugExtension.DebugCircle(CentreCoodrinate);
+
         }
     }
     public IEnumerator GenerateDungeon()
     {
+        
         int SmallestRoomIndex = 0;
         Rooms.Clear();
         Rooms.Add(RectInt); // Start with the initial full area
@@ -88,7 +97,20 @@ public class DungeonGenerator : MonoBehaviour
         }
         Rooms.Remove(Rooms[SmallestRoomIndex]);
 
+        GraphCreatorAndConnecter(Rooms);
+
     }
+
+    public void GraphCreatorAndConnecter(List<RectInt> RoomList)
+    {
+        foreach(RectInt Room in RoomList)
+        {
+            Graph.AddNode(Room);
+            
+        }
+        Graph.PrintGraph();
+    }
+
     private (RectInt, RectInt)? Splitlogic(RectInt PRect, float? GarunteeBias = 0)
     {
         float aspectRatio = (float)PRect.width / PRect.height;
@@ -134,7 +156,7 @@ public class DungeonGenerator : MonoBehaviour
             }
             
 
-            int splitY = Mathf.Clamp(PRect.height / 2 + (int)(PRect.height * SplitBuffer), minHeight, PRect.height - minHeight);
+            int splitY = Mathf.Clamp(PRect.height / 2 + (int)(PRect.height * BufferProper), minHeight, PRect.height - minHeight);
 
             RectInt RoomA = new RectInt(PRect.x, PRect.y, PRect.width, splitY);
             RectInt RoomB = new RectInt(PRect.x, PRect.y + splitY, PRect.width, PRect.height - splitY);
@@ -157,7 +179,7 @@ public class DungeonGenerator : MonoBehaviour
                 return null;
             }
 
-            int splitX = Mathf.Clamp(PRect.width / 2 + (int)(PRect.width * SplitBuffer), minWidth, PRect.width - minWidth);
+            int splitX = Mathf.Clamp(PRect.width / 2 + (int)(PRect.width * BufferProper), minWidth, PRect.width - minWidth);
 
             RectInt RoomA = new RectInt(PRect.x, PRect.y, splitX, PRect.height);
             RectInt RoomB = new RectInt(PRect.x + splitX, PRect.y, PRect.width - splitX, PRect.height);
