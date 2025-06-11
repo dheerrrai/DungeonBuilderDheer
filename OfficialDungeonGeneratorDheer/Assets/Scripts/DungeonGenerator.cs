@@ -36,16 +36,14 @@ public class DungeonGenerator : MonoBehaviour
     public NavMeshSurface NavMeshSurface;
     public float BuildTime = 0.01f;
 
-    [Button]
+
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
         //Hi
-        DungeonGraph = new Graph<RectInt>();
-        Rooms.Clear();
-        Rooms.Add(RectInt);
-        Debug.Log($"Generated {Rooms.Count} rooms");
+        
+        
         StartCoroutine(GenerateDungeon());
 
     }
@@ -61,14 +59,12 @@ public class DungeonGenerator : MonoBehaviour
 
         }
 
-        
-        
-
-        
 
     }
+    [Button]
     public IEnumerator GenerateDungeon()
     {
+        DungeonGraph = new Graph<RectInt>();        
         DoorCoords.Clear();
         int SmallestRoomIndex = 0;
         Rooms.Clear();
@@ -121,12 +117,13 @@ public class DungeonGenerator : MonoBehaviour
         }
         Rooms.Remove(Rooms[SmallestRoomIndex]);
 
-        GraphCreatorAndConnecter(Rooms);
-        CreateDoorsForOverlappingRooms(Rooms);
+        StartCoroutine(GraphCreatorAndConnecter(Rooms));
+        StartCoroutine(CreateDoorsForOverlappingRooms(Rooms));
+        StartCoroutine(SpawnDungeonAssets());
     }
     
 
-    void CreateDoorsForOverlappingRooms(List<RectInt> rooms)
+    public IEnumerator CreateDoorsForOverlappingRooms(List<RectInt> rooms)
     {
         DoorCoords.Clear();
         for (int i = 0; i < rooms.Count; i++)
@@ -192,7 +189,8 @@ public class DungeonGenerator : MonoBehaviour
                     if (!DoorCoords.Contains(NewCoords))
                     //PlaceDoor(new Vector2Int(doorX, doorY);
                     {
-                        
+                        yield return new WaitForSeconds(BuildTime);
+
                         DungeonGraph.AddNode(DoorRect);
                         DoorCoords.Add(NewCoords);
                         DungeonGraph.AddLink(RoomA, DoorRect);
@@ -210,10 +208,11 @@ public class DungeonGenerator : MonoBehaviour
     }
 
     
-    public void GraphCreatorAndConnecter(List<RectInt> RoomList)
+    public IEnumerator GraphCreatorAndConnecter(List<RectInt> RoomList)
     {
         foreach(RectInt Room in RoomList)
         {
+            yield return new WaitForSeconds(BuildTime);
             DungeonGraph.AddNode(Room);
             
         }
@@ -298,7 +297,6 @@ public class DungeonGenerator : MonoBehaviour
         
     }
 
-    [Button]
     public IEnumerator SpawnDungeonAssets()
     {
         Destroy(WallParent);
@@ -318,10 +316,10 @@ public class DungeonGenerator : MonoBehaviour
             foreach (Vector2Int j in i.allPositionsWithin)
             {
                 
-                //if ((j.x == i.xMax - 1 || j.x == i.xMin || j.y == i.yMax - 1 || j.y == i.yMin) && j != Door.position && !PlacedWalls.Contains(j))
+                
                 if ((j.x == i.xMax - 1 || j.x == i.xMin || j.y == i.yMax - 1 || j.y == i.yMin) && !PlacedWalls.Contains(j) && !DoorCoords.Contains(j))
                 {
-                    yield return new WaitForNextFrameUnit();
+                    yield return new WaitForSeconds(BuildTime);
                     GameObject WallPiece = Instantiate(Wall, new Vector3(j.x + 0.5f, 0.5f, j.y + 0.5f), Wall.transform.rotation, WallParent.transform);
                     WallPos.Add(WallPiece);
                     PlacedWalls.Add(j);
@@ -333,7 +331,7 @@ public class DungeonGenerator : MonoBehaviour
 
 
         }
-        StartCoroutine(Wait());
+        
 
 
 
@@ -344,12 +342,8 @@ public class DungeonGenerator : MonoBehaviour
         FloorObj.transform.localScale = new Vector3(Width, Height, 1f);
     }
 
-    // Create the BakeNavMesh() function here
-    [Button]
-    public void BakeNavMesh()
-    {
-
-    }
+    
+    
     IEnumerator Wait()
     {
 
@@ -378,15 +372,7 @@ public class DungeonGenerator : MonoBehaviour
                     Gizmos.DrawSphere(CentreNodeCoodrinate, 1f);
                 }
             }
-            //foreach (Rect in Graph)
-            //{
-                
-            //    foreach (RectInt Room in Node)
-            //    {
-
-            //        Room.center;
-            //    }
-            //}
+            
         }
     }
 }
