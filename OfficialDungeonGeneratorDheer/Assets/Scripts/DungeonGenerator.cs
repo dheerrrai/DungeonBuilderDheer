@@ -24,10 +24,7 @@ public class DungeonGenerator : MonoBehaviour
     public List<RectInt> Rooms = new List<RectInt>();
     public int RoomsCount = 0;
     [SerializeField] private Vector2Int MinimumRoomSize = new Vector2Int(6, 6);
-    [Range(0f, 0.5f)]
-    public float SplitBuffer = 0.2f;
-
-    public int DoorRange=2;
+    
     public Graph GraphScript;
     public Graph<RectInt> DungeonGraph;
     private TileMapGenerator TileMapScript;
@@ -36,14 +33,21 @@ public class DungeonGenerator : MonoBehaviour
 
     public float YHeight = 5f;
     [Space(10)]
-    public GameObject Floor;
+
     [Header("Asset Spawning")]
+
+    public GameObject Player;
+
     public List<GameObject> WallPos = new List<GameObject>();
     public List<Vector2> PlacedWalls = new List<Vector2>();
     private List<GameObject> PlacedFloors = new();
+    public GameObject Floor;
     public GameObject Wall;
     private GameObject WallParent;
     private GameObject FloorParent;
+
+    private FloodFiller FloodFill;
+    private GraphGenerator PathFindingGenerator;
     public NavMeshSurface NavMeshSurface;
     public float BuildTime = 0.01f;
 
@@ -54,8 +58,10 @@ public class DungeonGenerator : MonoBehaviour
     void Start()
     {
         //Hi
+        //Player.SetActive(false);
+        PathFindingGenerator = GetComponent<GraphGenerator>();
         TileMapScript = GetComponent<TileMapGenerator>();
-        
+        FloodFill = GetComponent<FloodFiller>();
         StartCoroutine(GenerateDungeon());
 
     }
@@ -439,6 +445,8 @@ public class DungeonGenerator : MonoBehaviour
         PlacedWalls.Clear();
 
         TileMapScript.GenerateTileMap(StartingRoom.size, Rooms);
+        //StartCoroutine(FloodFill.Floodfill((int)Rooms[0].center.x, (int)Rooms[0].center.y, Floor, FloorParent));
+        FloodFill.NoTimeFloodfill((int)Rooms[0].center.x, (int)Rooms[0].center.y, Floor, FloorParent);
 
         foreach (RectInt i in Rooms)
         {
@@ -456,26 +464,26 @@ public class DungeonGenerator : MonoBehaviour
 
 
             }
-            FloorGenerate(i, i.width, i.height);
+            
 
 
         }
-        //if ()
-        //{
-        //    NavMeshBuilder();
-        //}
+        //PathFindingGenerator.GenerateGraph();
+        StartCoroutine(NavMeshBuilder());
+        Player.transform.position = new Vector3(Rooms[0].center.x, 0f, Rooms[0].center.y);
+        //Player.SetActive(true);
 
 
 
     }
-    public void FloorGenerate(RectInt Room, float Width, float Height)
-    {
-        GameObject FloorObj = Instantiate(Floor, new Vector3(Room.center.x, 0f, Room.center.y), Floor.transform.rotation, FloorParent.transform);
-        FloorObj.transform.localScale = new Vector3(Width, Height, 1f);
-    }
+    //public void FloorGenerate(RectInt Room, float Width, float Height)
+    //{
+    //    GameObject FloorObj = Instantiate(Floor, new Vector3(Room.center.x, 0f, Room.center.y), Floor.transform.rotation, FloorParent.transform);
+    //    FloorObj.transform.localScale = new Vector3(Width, Height, 1f);
+    //}
 
-    
-    
+
+
     IEnumerator NavMeshBuilder()
     {
 

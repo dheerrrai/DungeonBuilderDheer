@@ -13,6 +13,10 @@ public class Graph<T>
     {
         GraphDict = new Dictionary<T, List<T>>();
     }
+    public void Clear()
+    {
+        GraphDict.Clear();
+    }
 
     public void AddNode(T Node)
     {
