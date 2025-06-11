@@ -7,11 +7,20 @@ using Unity.AI.Navigation;
 using Unity.VisualScripting;
 using UnityEditor;
 using UnityEngine;
-using UnityEngine.Tilemaps;
+
+using RangeAttribute = UnityEngine.RangeAttribute;
 
 public class DungeonGenerator : MonoBehaviour
 {
-    public RectInt RectInt = new RectInt(0, 0, 100, 50);
+    [Header("Seed Generation")]
+    public bool UseSeed = false;
+    public System.Random RandomSys;
+    public int Seed;
+
+    [Space(20)]
+
+    [Header("Rooms")]
+    public RectInt StartingRoom = new RectInt(0, 0, 100, 50);
     public List<RectInt> Rooms = new List<RectInt>();
     public int RoomsCount = 0;
     [SerializeField] private Vector2Int MinimumRoomSize = new Vector2Int(6, 6);
@@ -21,15 +30,16 @@ public class DungeonGenerator : MonoBehaviour
     public int DoorRange=2;
     public Graph GraphScript;
     public Graph<RectInt> DungeonGraph;
+    private TileMapGenerator TileMapScript;
 
     public List<Vector2Int> DoorCoords = new List<Vector2Int>();
 
     public float YHeight = 5f;
     [Space(10)]
     public GameObject Floor;
-
+    [Header("Asset Spawning")]
     public List<GameObject> WallPos = new List<GameObject>();
-    private List<Vector2> PlacedWalls = new List<Vector2>();
+    public List<Vector2> PlacedWalls = new List<Vector2>();
     private List<GameObject> PlacedFloors = new();
     public GameObject Wall;
     private GameObject WallParent;
@@ -39,11 +49,12 @@ public class DungeonGenerator : MonoBehaviour
 
 
 
+
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
         //Hi
-        
+        TileMapScript = GetComponent<TileMapGenerator>();
         
         StartCoroutine(GenerateDungeon());
 
@@ -65,11 +76,17 @@ public class DungeonGenerator : MonoBehaviour
     [Button]
     public IEnumerator GenerateDungeon()
     {
+        if (UseSeed) RandomSys = new System.Random(Seed);
+        else
+        {
+            RandomSys = new System.Random(System.Environment.TickCount);
+            Seed = System.Environment.TickCount;
+        }
         DungeonGraph = new Graph<RectInt>();        
         DoorCoords.Clear();
         
         Rooms.Clear();
-        Rooms.Add(RectInt); // Start with the initial full area
+        Rooms.Add(StartingRoom); // Start with the initial full area
 
         while (Rooms.Count < RoomsCount)
         {
@@ -177,13 +194,27 @@ public class DungeonGenerator : MonoBehaviour
 
             if (reachable == expected)
             {
-                // Proceed with removing from real graph
+                List<RectInt> connectedDoors = DungeonGraph.FindLinks(tempRoom)
+                    .Where(linked => DoorCoords.Contains(linked.position)) // Is a door
+                    .ToList();
+
+                foreach (RectInt door in connectedDoors)
+                {
+                    List<RectInt> linkedRooms = DungeonGraph.FindLinks(door)
+                        .Where(link => Rooms.Contains(link))
+                        .ToList();
+
+                    // If the door only connects to the room being removed OR no other valid rooms, remove it
+                    if (linkedRooms.Count <= 2)
+                    {
+                        DungeonGraph.RemoveNode(door);
+                        DoorCoords.Remove(door.position); // Clean from door list
+                    }
+                }
+
+                // Now remove the room
                 Rooms.Remove(tempRoom);
                 DungeonGraph.RemoveNode(tempRoom);
-
-                // Also clean up orphaned doors in the real graph
-                foreach (var door in orphanedDoors)
-                    DungeonGraph.RemoveNode(door);
             }
             else
             {
@@ -191,38 +222,25 @@ public class DungeonGenerator : MonoBehaviour
             }
             yield return new WaitForSeconds(BuildTime);
         }
-
-        //foreach (RectInt tempRoom in smallestRooms)
-        //{
-        //    yield return new WaitForSeconds(BuildTime);
-
-        //    // Temporarily remove from graph (simulate)
-        //    Graph<RectInt> clonedGraph = DungeonGraph; // You need a Clone() method
-        //    clonedGraph.RemoveNode(tempRoom);
-
-        //    // Choose a valid start room for BFS (not the one we're removing)
-        //    RectInt? startRoom = Rooms.FirstOrDefault(r => !r.Equals(tempRoom));
-        //    if (startRoom == null)
-        //        continue;
-
-        //    // Check if still fully connected
-        //    int reachable = clonedGraph.BFS(startRoom.Value).Count;
-        //    Debug.Log(reachable);
-        //    Debug.Log(Rooms.Count);
-        //    if (reachable == Rooms.Count)
-        //    {
-        //        Rooms.Remove(tempRoom);              // Remove from room list
-        //        DungeonGraph.RemoveNode(tempRoom);   // Remove from real graph
-        //    }
-        //    else
-        //    {
-        //        Debug.Log($"Skipped removing room {tempRoom} to maintain connectivity");
-        //    }
-        //}
-
-        StartCoroutine(SpawnDungeonAssets());
-
         
+        
+        foreach (var door in DoorCoords)
+        {
+            var doorRect = new RectInt(door, new Vector2Int(1, 1));
+            var links = DungeonGraph.FindLinks(doorRect);
+            if (links.Count < 2) // Not connected to at least two rooms
+            {
+                yield return new WaitForSeconds(BuildTime);
+                DungeonGraph.RemoveNode(doorRect);
+                DoorCoords.Remove(door);
+            }
+        }
+
+
+
+        StartCoroutine(SpawnDungeonAssetsAndTileMapCreation());
+
+
 
     }
 
@@ -244,34 +262,35 @@ public class DungeonGenerator : MonoBehaviour
                     RectInt OverLap = AlgorithmsUtils.Intersect(RoomA, RoomB);
                     int doorX = 0;
                     int doorY = 0;
+                    
+                    //Choose a point in the overlapping area for a door
+
                     if (OverLap.width < OverLap.height)
                     {
-
-                        // Get the range of the door spot
+                        // Vertical wall => door on vertical face
                         xMin = Mathf.Max(RoomA.xMin, RoomB.xMin);
-                        xMax = Mathf.Min(RoomA.xMax - 2, RoomB.xMax - 2);
-                        yMin = Mathf.Max(RoomA.yMin , RoomB.yMin );
-                        yMax = Mathf.Min(RoomA.yMax - 2, RoomB.yMax - 2);
-                        
+                        xMax = Mathf.Min(RoomA.xMax, RoomB.xMax);
+
+                        yMin = Mathf.Max(RoomA.yMin + 1, RoomB.yMin + 1);
+                        yMax = Mathf.Min(RoomA.yMax - 1, RoomB.yMax - 1);
+
+                        if (yMax <= yMin) continue; // Skip if range invalid
                         doorX = OverLap.x;
-                        doorY = Random.Range(yMin+1, yMax);
+                        doorY = RandomSys.Next(yMin, yMax);
                     }
                     else
                     {
-
-                        // Get the range of the door spot
-                        xMin = Mathf.Max(RoomA.xMin + 2, RoomB.xMin +2);
-                        xMax = Mathf.Min(RoomA.xMax , RoomB.xMax );
-                        yMin = Mathf.Max(RoomA.yMin + 2, RoomB.yMin + 2);
+                        // Horizontal wall => door on horizontal face
+                        yMin = Mathf.Max(RoomA.yMin, RoomB.yMin);
                         yMax = Mathf.Min(RoomA.yMax, RoomB.yMax);
-                        
-                        doorX = Random.Range(xMin, xMax-1);
+
+                        xMin = Mathf.Max(RoomA.xMin + 1, RoomB.xMin + 1);
+                        xMax = Mathf.Min(RoomA.xMax - 1, RoomB.xMax - 1);
+
+                        if (xMax <= xMin) continue; // Skip if range invalid
+                        doorX = RandomSys.Next(xMin, xMax);
                         doorY = OverLap.y;
                     }
-                    //Choose a point in the overlapping area for a door
-
-                    
-
 
                     int overlapWidth = xMax  - xMin;
                     int overlapHeight = yMax  - yMin;
@@ -344,9 +363,9 @@ public class DungeonGenerator : MonoBehaviour
 
         
 
-        bool SplitHorizontally = Random.value + GarunteeBias < HorizontalSplitChance;
+        bool SplitHorizontally = (RandomSys.Next(0,101)/100f) + GarunteeBias < HorizontalSplitChance;
 
-        float BufferProper = Random.Range(-SplitBuffer, SplitBuffer);
+        //float BufferProper = RandomSys.Next(-SplitBuffer, SplitBuffer);
 
         int minHeight = MinimumRoomSize.y;
         int minWidth = MinimumRoomSize.x;
@@ -363,7 +382,7 @@ public class DungeonGenerator : MonoBehaviour
                 if (PRect.width > minWidth * 2 && GarunteeBias == 0f)
                 {
                     Debug.Log("Recursed");
-                    return Splitlogic(PRect, -1f);
+                    return Splitlogic(PRect, -1f); //RECURSION
 
                 }
 
@@ -371,7 +390,7 @@ public class DungeonGenerator : MonoBehaviour
             }
             
 
-            int splitY = Mathf.Clamp(PRect.height / 2 + (int)(PRect.height * BufferProper), minHeight, PRect.height - minHeight);
+            int splitY = RandomSys.Next(minHeight, PRect.height - minHeight+1);
 
             RectInt RoomA = new RectInt(PRect.x, PRect.y, PRect.width, splitY +1);
             RectInt RoomB = new RectInt(PRect.x, PRect.y + splitY, PRect.width, PRect.height - splitY);
@@ -394,7 +413,7 @@ public class DungeonGenerator : MonoBehaviour
                 return null;
             }
 
-            int splitX = Mathf.Clamp(PRect.width / 2 + (int)(PRect.width * BufferProper), minWidth, PRect.width - minWidth);
+            int splitX = RandomSys.Next(minWidth, PRect.width - minWidth + 1);
 
             RectInt RoomA = new RectInt(PRect.x, PRect.y, splitX + 1, PRect.height  );
             RectInt RoomB = new RectInt(PRect.x + splitX, PRect.y, PRect.width - splitX, PRect.height );
@@ -404,7 +423,7 @@ public class DungeonGenerator : MonoBehaviour
         
     }
 
-    public IEnumerator SpawnDungeonAssets()
+    public IEnumerator SpawnDungeonAssetsAndTileMapCreation()
     {
         Destroy(WallParent);
         Destroy(FloorParent);
@@ -418,6 +437,9 @@ public class DungeonGenerator : MonoBehaviour
         PlacedFloors.Clear();
         WallPos.Clear();
         PlacedWalls.Clear();
+
+        TileMapScript.GenerateTileMap(StartingRoom.size, Rooms);
+
         foreach (RectInt i in Rooms)
         {
             foreach (Vector2Int j in i.allPositionsWithin)
@@ -438,7 +460,10 @@ public class DungeonGenerator : MonoBehaviour
 
 
         }
-        
+        //if ()
+        //{
+        //    NavMeshBuilder();
+        //}
 
 
 
@@ -451,7 +476,7 @@ public class DungeonGenerator : MonoBehaviour
 
     
     
-    IEnumerator Wait()
+    IEnumerator NavMeshBuilder()
     {
 
         yield return new WaitForSeconds(0.1f);
