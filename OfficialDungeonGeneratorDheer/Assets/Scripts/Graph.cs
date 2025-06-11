@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -21,6 +23,13 @@ public class Graph<T>
         }
 
     }
+    public void RemoveNode(T Node)
+    {
+        if (!GraphDict.ContainsKey(Node)) 
+        {
+            GraphDict.Remove(Node);
+        }
+    }
     public void AddLink(T FromNode, T ToNode)
     {
         if (!GraphDict.ContainsKey(FromNode) || !GraphDict.ContainsKey(ToNode))
@@ -39,6 +48,10 @@ public class Graph<T>
         }
 
         return new List<T>(GraphDict[Node]);
+    }
+    public List<T> GetAllNodes()
+    {
+        return GraphDict.Keys.ToList();
     }
     public bool ContainsNode(T node)
     {
@@ -65,7 +78,7 @@ public class Graph<T>
         }
         return ListPrinted;
     }
-    public Queue<T> BFS(T Node)
+    public List<T> BFS(T Node)
     {
         List<T> Discovered = new List<T>();
         Queue<T> Queue = new Queue<T>();
@@ -78,17 +91,17 @@ public class Graph<T>
             Debug.Log(Node);
             foreach (T Value in GraphDict[Node])
             {
-                if (!Discovered.Contains(Node))
+                if (!Discovered.Contains(Value))
                 {
                     Queue.Enqueue(Value);
                     Discovered.Add(Value);
                 }
             }
         }
-        return Queue;
+        return Discovered;
 
     }
-    public Stack<T> DFS(T Node)
+    public List<T> DFS(T Node)
     {
         List<T> Discovered = new List<T>();
         Stack<T> Stack = new Stack<T>();
@@ -106,7 +119,7 @@ public class Graph<T>
                 }
             }
         }
-        return Stack;
+        return Discovered;
     }
 
 }

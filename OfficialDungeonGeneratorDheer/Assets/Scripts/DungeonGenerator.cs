@@ -2,6 +2,7 @@ using NaughtyAttributes;
 
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using Unity.AI.Navigation;
 using Unity.VisualScripting;
 using UnityEditor;
@@ -14,7 +15,7 @@ public class DungeonGenerator : MonoBehaviour
     public List<RectInt> Rooms = new List<RectInt>();
     public int RoomsCount = 0;
     [SerializeField] private Vector2Int MinimumRoomSize = new Vector2Int(6, 6);
-    public float CouroutineTime = 0.1f;
+    [Range(0f, 0.5f)]
     public float SplitBuffer = 0.2f;
 
     public int DoorRange=2;
@@ -66,7 +67,7 @@ public class DungeonGenerator : MonoBehaviour
     {
         DungeonGraph = new Graph<RectInt>();        
         DoorCoords.Clear();
-        int SmallestRoomIndex = 0;
+        
         Rooms.Clear();
         Rooms.Add(RectInt); // Start with the initial full area
 
@@ -104,34 +105,136 @@ public class DungeonGenerator : MonoBehaviour
                 break;
 
             Rooms = newRooms;
-            yield return new WaitForSeconds(CouroutineTime);
+            yield return new WaitForSeconds(BuildTime);
         }
 
-        for(int i = 0; i < Rooms.Count; i++) 
-        {        
-            int SmallestHeight = Rooms[SmallestRoomIndex].height;
-            int SmallestWidth = Rooms[SmallestRoomIndex].width;
 
-            if (Rooms[i].height * Rooms[i].width < SmallestHeight * SmallestWidth) SmallestRoomIndex=i; 
-
-        }
-        Rooms.Remove(Rooms[SmallestRoomIndex]);
-
+        
         StartCoroutine(GraphCreatorAndConnecter(Rooms));
-        StartCoroutine(CreateDoorsForOverlappingRooms(Rooms));
-        StartCoroutine(SpawnDungeonAssets());
+        
     }
     
+    public IEnumerator SmallestRoomRemover(List<RectInt>Rooms)
+    {
+        List<int> RoomIndexes = new List<int>();
+        List<int> RoomAreas = new List<int>();
+        for (int i = 0; i < Rooms.Count - 1; i++)
+        {
+            RoomAreas.Add(Rooms[i].height * Rooms[i].width);
+            RoomIndexes.Add(i);
+        }
+        for(int i = 0;i < RoomIndexes.Count-1; i++)
+        {
+            bool Swapped = false;
+            for(int j = 0; j < RoomIndexes.Count - i - 1; j++)
+            {
+                if (RoomAreas[j] > RoomAreas[j + 1])
+                {
+                    int temp = RoomAreas[j];
+                    RoomAreas[j] = RoomAreas[j + 1];
+                    RoomAreas[j + 1] = temp;
+                    temp = RoomIndexes[j];
+                    RoomIndexes[j] = RoomIndexes[j + 1];
+                    RoomIndexes[j + 1] = temp;
+                    Swapped = true;
+                }
+            }
+            if (!Swapped)
+                break;
+        }
+        int minimum = RoomIndexes.Count / 10;
+        List<RectInt> smallestRooms = RoomIndexes
+            .GetRange(0, minimum)
+            .Select(index => Rooms[index])
+            .ToList();
+        foreach (RectInt tempRoom in smallestRooms)
+        {
+            // Clone the full graph
+            Graph<RectInt> SimulatedGraph = DungeonGraph;
 
-    public IEnumerator CreateDoorsForOverlappingRooms(List<RectInt> rooms)
+            SimulatedGraph.RemoveNode(tempRoom);
+
+            // Now remove any doors that were only connected to that room
+            List<RectInt> orphanedDoors = SimulatedGraph.GetAllNodes()
+                .Where(node => !Rooms.Contains(node)) // Only doors
+                .Where(door => SimulatedGraph.FindLinks(door).Count == 0) // No connections left
+                .ToList();
+
+            foreach (var door in orphanedDoors)
+            {
+                SimulatedGraph.RemoveNode(door);
+            }
+
+            // Check if it's still connected
+            RectInt? startRoom = Rooms.FirstOrDefault(r => !r.Equals(tempRoom));
+            if (startRoom == null)
+            {
+                Debug.LogWarning("No valid start room found for BFS");
+                continue; // Skip this room
+            }
+            int reachable = SimulatedGraph.BFS(startRoom.Value).Count;
+            int expected = SimulatedGraph.GetAllNodes().Count();
+
+            if (reachable == expected)
+            {
+                // Proceed with removing from real graph
+                Rooms.Remove(tempRoom);
+                DungeonGraph.RemoveNode(tempRoom);
+
+                // Also clean up orphaned doors in the real graph
+                foreach (var door in orphanedDoors)
+                    DungeonGraph.RemoveNode(door);
+            }
+            else
+            {
+                Debug.Log($"Room {tempRoom} removal would break connectivity");
+            }
+            yield return new WaitForSeconds(BuildTime);
+        }
+
+        //foreach (RectInt tempRoom in smallestRooms)
+        //{
+        //    yield return new WaitForSeconds(BuildTime);
+
+        //    // Temporarily remove from graph (simulate)
+        //    Graph<RectInt> clonedGraph = DungeonGraph; // You need a Clone() method
+        //    clonedGraph.RemoveNode(tempRoom);
+
+        //    // Choose a valid start room for BFS (not the one we're removing)
+        //    RectInt? startRoom = Rooms.FirstOrDefault(r => !r.Equals(tempRoom));
+        //    if (startRoom == null)
+        //        continue;
+
+        //    // Check if still fully connected
+        //    int reachable = clonedGraph.BFS(startRoom.Value).Count;
+        //    Debug.Log(reachable);
+        //    Debug.Log(Rooms.Count);
+        //    if (reachable == Rooms.Count)
+        //    {
+        //        Rooms.Remove(tempRoom);              // Remove from room list
+        //        DungeonGraph.RemoveNode(tempRoom);   // Remove from real graph
+        //    }
+        //    else
+        //    {
+        //        Debug.Log($"Skipped removing room {tempRoom} to maintain connectivity");
+        //    }
+        //}
+
+        StartCoroutine(SpawnDungeonAssets());
+
+        
+
+    }
+
+    public IEnumerator CreateDoorsForOverlappingRooms(List<RectInt> Rooms)
     {
         DoorCoords.Clear();
-        for (int i = 0; i < rooms.Count; i++)
+        for (int i = 0; i < Rooms.Count; i++)
         {
-            for (int j = i + 1; j < rooms.Count; j++)
+            for (int j = i + 1; j < Rooms.Count; j++)
             {
-                RectInt RoomA = rooms[i];
-                RectInt RoomB = rooms[j];
+                RectInt RoomA = Rooms[i];
+                RectInt RoomB = Rooms[j];
                 int xMin = 0;
                 int xMax = 0;
                 int yMin = 0;
@@ -205,6 +308,8 @@ public class DungeonGenerator : MonoBehaviour
 
 
         }
+        StartCoroutine(SmallestRoomRemover(Rooms));
+        
     }
 
     
@@ -216,7 +321,9 @@ public class DungeonGenerator : MonoBehaviour
             DungeonGraph.AddNode(Room);
             
         }
-        //DungeonGraph.PrintGraph();
+
+        StartCoroutine(CreateDoorsForOverlappingRooms(Rooms));
+
     }
 
     private (RectInt, RectInt)? Splitlogic(RectInt PRect, float? GarunteeBias = 0)
